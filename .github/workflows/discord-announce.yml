@@ -1,0 +1,36 @@
+name: discord-announce
+
+# Fires only when a draft release is flipped to published (release: released),
+# so the download link always resolves. The private source repo's release.yml
+# creates the release here as a draft; publishing it by hand triggers this.
+
+on:
+  release:
+    types: [released]
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Discord
+        shell: pwsh
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          TAG: ${{ github.event.release.tag_name }}
+          NAME: ${{ github.event.release.name }}
+          URL: ${{ github.event.release.html_url }}
+        run: |
+          if (-not $env:WEBHOOK) { throw "DISCORD_RELEASE_WEBHOOK secret is not set" }
+          $payload = @{
+            username = "Lopari Releases"
+            embeds = @(@{
+              title       = "$env:NAME is out"
+              url         = "https://lopari.app"
+              description = "A new version of the head-tracking launcher is live.`n`n**[Download from lopari.app](https://lopari.app)** (updates automatically) or grab the signed installer from the [$env:TAG release]($env:URL)."
+              color       = 5814783
+            })
+          } | ConvertTo-Json -Depth 5
+          Invoke-RestMethod -Uri $env:WEBHOOK -Method Post -ContentType 'application/json' -Body $payload
